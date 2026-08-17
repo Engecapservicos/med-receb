@@ -1171,10 +1171,18 @@ async function migrarDadosLocais() {
       await sb.from('itens').delete().eq('obra_id', obraAtual.id);
       if (!itens.length) return;
       // garante IDs únicos o suficiente
-      // normaliza IDs antes de gravar
+      // Garante IDs únicos DENTRO da obra (evita duplicate key)
+      const used = new Set();
       itens.forEach((i, idx) => {
-        if (!i.id || i.id < 100000) i.id = novoId() + idx;
+        let id = Number(i.id) || 0;
+        if (!id || used.has(id)) {
+          id = novoId() + idx;
+          while (used.has(id)) id++;
+          i.id = id;
+        }
+        used.add(id);
       });
+      // Reaponta resumoId dos pais se o resumo mudou de id (melhor esforço por descricao/ordem)
       const rows = itens.map((i, idx) => ({
         id: Number(i.id),
         obra_id: obraAtual.id,
