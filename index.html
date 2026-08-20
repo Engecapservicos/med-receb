@@ -1722,14 +1722,23 @@ async function migrarDadosLocais() {
         totalBruto: total,
         totalDescontos,
         descontos: descontos.map(d => ({ id: d.id, descricao: d.descricao, valor: d.valor })),
-        itens: lancados.map(i => ({
-          id: i.id,
-          descricao: i.descricao,
-          unidade: i.unidade,
-          medido: i.medidoPeriodo,
-          valorUnit: i.valorUnit,
-          valorTotal: i.medidoPeriodo * (i.valorUnit || 0)
-        }))
+        itens: lancados.map(i => {
+          let paiDesc = '';
+          if (i.tipo === 'filho' && i.grupo) {
+            const pai = itens.find(p => p.tipo === 'pai' && p.grupo === i.grupo);
+            if (pai) paiDesc = pai.descricao || '';
+          }
+          return {
+            id: i.id,
+            descricao: i.descricao,
+            paiDescricao: paiDesc,
+            unidade: i.unidade,
+            medido: i.medidoPeriodo,
+            valorUnit: i.valorUnit,
+            valorTotal: i.medidoPeriodo * (i.valorUnit || 0)
+          };
+        }),
+        criadoPor: (usuario && usuario.nome) ? usuario.nome : ''
       };
 
       // Atualiza saldos dos filhos
@@ -2048,6 +2057,13 @@ async function migrarDadosLocais() {
 
       y += 6;
       doc.setFont(undefined, 'bold');
+      doc.text('Criado por:', 14, y);
+      doc.setFont(undefined, 'normal');
+      const criadoPor = medicao.criadoPor || (usuario && usuario.nome) || '';
+      doc.text(String(criadoPor), 38, y);
+
+      y += 6;
+      doc.setFont(undefined, 'bold');
       doc.setTextColor(5, 120, 80);
       doc.text('Valor total desta medição:', 14, y);
       doc.setFontSize(12);
@@ -2059,13 +2075,26 @@ async function migrarDadosLocais() {
         startY: y + 6,
         head: [['Descrição do Serviço', 'Un.', 'Qtd Medida', 'Valor Unit.', 'Valor Total']],
         body: [
-          ...medicao.itens.map(i => [
-            i.descricao,
-            i.unidade || '',
-            fmt(i.medido, 3),
-            fmtMoney(i.valorUnit),
-            fmtMoney(i.valorTotal)
-          ]),
+          ...medicao.itens.map(i => {
+            let desc = i.descricao || '';
+            // Pai na descrição (salvo no lançamento ou resolvido agora)
+            let paiDesc = i.paiDescricao || '';
+            if (!paiDesc && i.id && typeof itens !== 'undefined') {
+              const item = itens.find(x => x.id === i.id);
+              if (item && item.tipo === 'filho' && item.grupo) {
+                const pai = itens.find(p => p.tipo === 'pai' && p.grupo === item.grupo);
+                if (pai) paiDesc = pai.descricao || '';
+              }
+            }
+            if (paiDesc) desc = paiDesc + ' — ' + desc;
+            return [
+              desc,
+              i.unidade || '',
+              fmt(i.medido, 3),
+              fmtMoney(i.valorUnit),
+              fmtMoney(i.valorTotal)
+            ];
+          }),
           ...(medicao.descontos || []).map(d => [
             'DESCONTO: ' + d.descricao,
             '',
