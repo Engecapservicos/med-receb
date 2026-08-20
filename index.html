@@ -237,14 +237,26 @@
             <button onclick="voltarDaMedicao()" class="text-slate-400 hover:text-white text-sm">← Voltar</button>
             <h1 class="text-lg font-bold" id="tituloObra">Medição</h1>
           </div>
-          <div class="flex items-center gap-4 text-sm">
-            <div class="text-right">
-              <p class="text-slate-400 text-xs">Valor desta medição</p>
-              <p id="totalMedicao" class="text-xl font-bold text-emerald-400">R$ 0,00</p>
+          <div class="flex flex-wrap items-center gap-3 text-sm">
+            <div class="bg-slate-800/80 rounded-lg px-3 py-1.5 text-right min-w-[110px]">
+              <p class="text-slate-400 text-[10px] uppercase tracking-wide">Contrato</p>
+              <p id="kpiContrato" class="text-sm font-bold text-blue-300">R$ 0,00</p>
             </div>
-            <div class="text-right">
-              <p class="text-slate-400 text-xs">Itens lançados</p>
-              <p id="itensLancados" class="text-xl font-bold">0</p>
+            <div class="bg-slate-800/80 rounded-lg px-3 py-1.5 text-right min-w-[110px]">
+              <p class="text-slate-400 text-[10px] uppercase tracking-wide">Saldo</p>
+              <p id="kpiSaldo" class="text-sm font-bold text-amber-300">R$ 0,00</p>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg px-3 py-1.5 text-right min-w-[110px]">
+              <p class="text-slate-400 text-[10px] uppercase tracking-wide">Descontos</p>
+              <p id="kpiDescontos" class="text-sm font-bold text-red-300">R$ 0,00</p>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg px-3 py-1.5 text-right min-w-[120px]">
+              <p class="text-slate-400 text-[10px] uppercase tracking-wide">Esta medição</p>
+              <p id="totalMedicao" class="text-sm font-bold text-emerald-400">R$ 0,00</p>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg px-3 py-1.5 text-right min-w-[70px]">
+              <p class="text-slate-400 text-[10px] uppercase tracking-wide">Itens</p>
+              <p id="itensLancados" class="text-sm font-bold">0</p>
             </div>
           </div>
         </div>
@@ -1479,6 +1491,9 @@ async function migrarDadosLocais() {
       if (itens.length === 0) {
         aviso.classList.remove('hidden');
         document.getElementById('totalMedicao').textContent = 'R$ 0,00';
+        const k1 = document.getElementById('kpiContrato'); if (k1) k1.textContent = 'R$ 0,00';
+        const k2 = document.getElementById('kpiSaldo'); if (k2) k2.textContent = 'R$ 0,00';
+        const k3 = document.getElementById('kpiDescontos'); if (k3) k3.textContent = 'R$ 0,00';
         document.getElementById('itensLancados').textContent = '0';
         return;
       }
@@ -1617,6 +1632,24 @@ async function migrarDadosLocais() {
         totalMedicao -= d.valor;
       });
 
+      // KPIs obra: contrato e saldo (só filhos, ou pais sem filhos)
+      let valorContrato = 0, valorSaldo = 0;
+      itens.forEach(i => {
+        const isFilho = i.tipo === 'filho';
+        const isPaiSemFilho = i.tipo === 'pai' && !itens.some(f => f.tipo === 'filho' && f.grupo === i.grupo);
+        if (!isFilho && !isPaiSemFilho) return;
+        const vu = Number(i.valorUnit) || 0;
+        valorContrato += (Number(i.qtdContrato) || 0) * vu;
+        valorSaldo += (Number(i.saldoInicial) || 0) * vu;
+      });
+      // descontos da medição atual + já salvos no histórico
+      let totalDescAtual = descontos.reduce((s, d) => s + (Number(d.valor) || 0), 0);
+      let totalDescHist = (historico || []).reduce((s, m) => s + (Number(m.totalDescontos) || 0), 0);
+      const totalDescGeral = totalDescAtual + totalDescHist;
+
+      document.getElementById('kpiContrato').textContent = fmtMoney(valorContrato);
+      document.getElementById('kpiSaldo').textContent = fmtMoney(valorSaldo);
+      document.getElementById('kpiDescontos').textContent = fmtMoney(totalDescGeral);
       document.getElementById('totalMedicao').textContent = fmtMoney(totalMedicao);
       document.getElementById('itensLancados').textContent = itensComLancamento;
     }
